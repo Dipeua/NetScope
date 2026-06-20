@@ -118,7 +118,7 @@ function showTrace(d) {
     return `<tr><td class="mono">${h.hop}</td><td class="mono">${h.ip ? esc(h.ip) : "*"}</td>
       <td>${loc}</td><td class="mono">${h.rtt_ms != null ? h.rtt_ms + " ms" : "—"}</td></tr>`;
   }).join("");
-  add(`<table><thead><tr><th>#</th><th>IP</th><th>Pays / Ville</th><th>Temps</th></tr></thead><tbody>${rows}</tbody></table>` + raw(d.raw));
+  add(`<div class="table-wrap"><table><thead><tr><th>#</th><th>IP</th><th>Pays / Ville</th><th>Temps</th></tr></thead><tbody>${rows}</tbody></table></div>` + raw(d.raw));
 
   if (pts.length) animateTrace(pts);
 }

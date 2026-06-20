@@ -140,6 +140,7 @@ h1 {
 }
 
 /* Tables */
+.table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th { text-align: left; color: #6b7280; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; padding: 9px 10px; border-bottom: 2px solid #eceef2; }
 td { padding: 10px; border-bottom: 1px solid #f0f1f4; }

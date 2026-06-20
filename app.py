@@ -137,6 +137,10 @@ def tool_traceroute(target):
             "ip": ip_match.group(1) if ip_match else None,
             "rtt_ms": float(rtt_match.group(1)) if rtt_match else None,
         })
+    # Auto-stop: trim trailing hops that never answered (the '*' lines up to 30),
+    # so we only show the meaningful part of the route.
+    while len(hops) > 1 and hops[-1]["ip"] is None:
+        hops.pop()
     geo = geolocate([h["ip"] for h in hops if h["ip"]])
     for h in hops:
         g = geo.get(h["ip"]) if h["ip"] else None
