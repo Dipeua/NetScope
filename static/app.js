@@ -2,7 +2,7 @@ const targetInput = document.getElementById("target");
 const resultEl = document.getElementById("result");
 const mapEl = document.getElementById("map");
 const buttons = document.querySelectorAll(".buttons button");
-let mapInstance = null;
+let traceMap = null, traceToken = 0;
 
 const TITLES = {
   ping: "Ping", traceroute: "Traceroute", port: "Scan de ports",
@@ -46,6 +46,7 @@ async function run(tool, rtype) {
 
   buttons.forEach((b) => { b.disabled = true; b.classList.toggle("active", b.dataset.tool === tool); });
   mapEl.classList.add("hidden");
+  traceToken++; // stop any running traceroute animation
   resultEl.innerHTML = `<div class="loading"><span class="spinner"></span> ${TITLES[tool]} en cours…</div>`;
 
   const payload = { target };
@@ -89,20 +90,27 @@ function showPing(d) {
   </div>` + raw(d.raw));
 }
 
-/* ---- Traceroute (with flags) ---- */
+/* ---- Traceroute (animated map top-right + flags + table) ---- */
 function showTrace(d) {
   const hops = d.hops || [];
-  // ordered list of countries crossed
+  const pts = hops.filter((h) => h.lat != null && h.lon != null);
   const path = [];
   hops.forEach((h) => {
     if (h.countryCode && (!path.length || path[path.length - 1].cc !== h.countryCode))
       path.push({ cc: h.countryCode, name: h.country });
   });
-  if (path.length) {
-    add(`<div class="flag-path"><div class="label">Pays traversés</div>` +
-      path.map((p, i) => `<span class="step">${flag(p.cc)} ${esc(p.name)}</span>${i < path.length - 1 ? '<span class="arrow">→</span>' : ""}`).join("") +
-      `</div>`);
-  }
+
+  // Top zone: summary on the left, animated "radar" map on the right
+  add(`<div class="trace-top">
+    <div class="trace-summary">
+      <div class="stat"><div class="label">Sauts</div><div class="value">${hops.length}</div></div>
+      ${path.length ? `<div class="trace-flags"><div class="label" style="margin-bottom:7px">Pays traversés</div>${path.map((p) => `<div class="step">${flag(p.cc)} ${esc(p.name)}</div>`).join("")}</div>` : ""}
+    </div>
+    ${pts.length
+      ? `<div id="traceMap" class="trace-map"></div>`
+      : `<div class="trace-map trace-map-empty">Géolocalisation indisponible<br>(sauts privés uniquement)</div>`}
+  </div>`);
+
   const rows = hops.map((h) => {
     const loc = h.country
       ? `${h.countryCode ? flag(h.countryCode) + " " : ""}${esc(h.country)}${h.city ? " · " + esc(h.city) : ""}`
@@ -111,26 +119,62 @@ function showTrace(d) {
       <td>${loc}</td><td class="mono">${h.rtt_ms != null ? h.rtt_ms + " ms" : "—"}</td></tr>`;
   }).join("");
   add(`<table><thead><tr><th>#</th><th>IP</th><th>Pays / Ville</th><th>Temps</th></tr></thead><tbody>${rows}</tbody></table>` + raw(d.raw));
-  drawMap(hops);
+
+  if (pts.length) animateTrace(pts);
 }
 
-function drawMap(hops) {
-  const pts = hops.filter((h) => h.lat != null && h.lon != null);
-  if (!pts.length) return mapEl.classList.add("hidden");
-  mapEl.classList.remove("hidden");
-  if (mapInstance) { mapInstance.remove(); mapInstance = null; }
-  mapInstance = L.map(mapEl, { attributionControl: false });
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(mapInstance);
-  const latlngs = [];
-  pts.forEach((h, i) => {
-    const ll = [h.lat, h.lon]; latlngs.push(ll);
-    L.circleMarker(ll, { radius: 7, color: "#3b82f6", fillColor: i === pts.length - 1 ? "#16a34a" : "#3b82f6", fillOpacity: 0.9, weight: 2 })
-      .addTo(mapInstance)
-      .bindPopup(`<div class="hop-popup"><b>Hop ${h.hop}</b><br>${esc(h.ip)}<br>${esc(h.country || "")}${h.city ? ", " + esc(h.city) : ""}</div>`);
-  });
-  L.polyline(latlngs, { color: "#3b82f6", weight: 2, opacity: 0.6, dashArray: "6 8" }).addTo(mapInstance);
-  mapInstance.fitBounds(L.latLngBounds(latlngs).pad(0.25));
-  setTimeout(() => mapInstance.invalidateSize(), 200);
+function animateTrace(pts) {
+  const el = document.getElementById("traceMap");
+  if (!el || !window.L) return;
+  const myToken = ++traceToken;
+  if (traceMap) { try { traceMap.remove(); } catch (e) {} traceMap = null; }
+
+  const map = L.map(el, { attributionControl: false, zoomControl: true });
+  traceMap = map;
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 19 }).addTo(map);
+
+  const latlngs = pts.map((h) => [h.lat, h.lon]);
+  map.fitBounds(L.latLngBounds(latlngs).pad(0.3));
+  setTimeout(() => map.invalidateSize(), 150);
+
+  // hop dots (revealed as the packet reaches them)
+  const dots = latlngs.map((ll, i) => L.circleMarker(ll, {
+    radius: i === latlngs.length - 1 ? 6 : 4, color: "#7dd3fc", weight: 2,
+    fillColor: i === latlngs.length - 1 ? "#22c55e" : "#38bdf8", fillOpacity: 0.9, opacity: 0,
+  }).addTo(map).bindPopup(
+    `<div class="hop-popup"><b>Hop ${pts[i].hop}</b><br>${esc(pts[i].ip)}<br>${esc(pts[i].country || "")}${pts[i].city ? ", " + esc(pts[i].city) : ""}</div>`));
+
+  const glow = L.polyline([], { color: "#38bdf8", weight: 10, opacity: 0.16 }).addTo(map);
+  const trail = L.polyline([], { color: "#7dd3fc", weight: 3, opacity: 0.9 }).addTo(map);
+  const halo = L.circleMarker(latlngs[0], { radius: 13, stroke: false, fillColor: "#fbbf24", fillOpacity: 0.25 }).addTo(map);
+  const packet = L.circleMarker(latlngs[0], { radius: 5, color: "#fff", weight: 2, fillColor: "#fbbf24", fillOpacity: 1 }).addTo(map);
+
+  function play() {
+    if (myToken !== traceToken) return;
+    let seg = 0;
+    const trailPts = [latlngs[0]];
+    trail.setLatLngs([]); glow.setLatLngs([]);
+    dots.forEach((dm, i) => dm.setStyle({ opacity: i === 0 ? 1 : 0 }));
+    packet.setLatLng(latlngs[0]); halo.setLatLng(latlngs[0]);
+
+    function segment() {
+      if (myToken !== traceToken) return;
+      if (seg >= latlngs.length - 1) { setTimeout(play, 1800); return; } // loop
+      const a = latlngs[seg], b = latlngs[seg + 1], dur = 650, t0 = performance.now();
+      (function frame(now) {
+        if (myToken !== traceToken) return;
+        const t = Math.min(1, (now - t0) / dur);
+        const ll = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+        packet.setLatLng(ll); halo.setLatLng(ll);
+        const cur = [...trailPts, ll];
+        trail.setLatLngs(cur); glow.setLatLngs(cur);
+        if (t < 1) requestAnimationFrame(frame);
+        else { trailPts.push(b); dots[seg + 1].setStyle({ opacity: 1 }); seg++; segment(); }
+      })(performance.now());
+    }
+    setTimeout(segment, 350);
+  }
+  setTimeout(play, 400);
 }
 
 /* ---- Ports ---- */
