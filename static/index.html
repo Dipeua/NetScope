@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetScope — Network Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <h1>NetScope</h1>
+    <p class="tagline">Entrez un domaine ou une IP, puis choisissez un outil.</p>
+
+    <input id="target" type="text" placeholder="exemple.com  ou  8.8.8.8" autocomplete="off" spellcheck="false" />
+
+    <div class="buttons">
+      <button data-tool="ping">Ping</button>
+      <button data-tool="traceroute">Traceroute</button>
+      <button data-tool="port">Ports</button>
+      <button data-tool="whois">Whois</button>
+      <button data-tool="dns">DNS</button>
+      <button data-tool="ssl">SSL</button>
+      <button data-tool="http">HTTP</button>
+    </div>
+
+    <div id="dnsTypes" class="dns-types hidden">
+      <span class="dns-types-label">Type :</span>
+      <button data-rtype="ALL" class="active">Tous</button>
+      <button data-rtype="A">A</button>
+      <button data-rtype="AAAA">AAAA</button>
+      <button data-rtype="MX">MX</button>
+      <button data-rtype="NS">NS</button>
+      <button data-rtype="TXT">TXT</button>
+      <button data-rtype="CNAME">CNAME</button>
+      <button data-rtype="SOA">SOA</button>
+      <button data-rtype="PTR">PTR</button>
+      <button data-rtype="SRV">SRV</button>
+      <button data-rtype="CAA">CAA</button>
+      <button data-rtype="DNSKEY">DNSKEY</button>
+      <button data-rtype="DS">DS</button>
+      <button data-rtype="TLSA">TLSA</button>
+    </div>
+
+    <div id="result"></div>
+    <div id="map" class="map hidden"></div>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
